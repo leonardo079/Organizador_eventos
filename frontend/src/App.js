@@ -10,6 +10,8 @@ export default function EventosApp() {
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
   const [formData, setFormData] = useState({});
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
 
   useEffect(() => {
     if (activeTab === 'eventos') fetchEventos();
@@ -71,14 +73,24 @@ export default function EventosApp() {
     }
   };
 
-  const handleDelete = async (id, tipo) => {
-    if (!confirm('¿Estás seguro de eliminar?')) return;
-    
+  const handleDelete = (id, tipo) => {
+    setItemToDelete({ id, tipo });
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
+
+    const { id, tipo } = itemToDelete;
     try {
       const url = tipo === 'evento' ? `${API_URL}/eventos/${id}` : `${API_URL}/asistentes/${id}`;
       const res = await fetch(url, { method: 'DELETE' });
       if (res.ok) {
-        tipo === 'evento' ? fetchEventos() : fetchAsistentes();
+        if (tipo === 'evento') {
+          fetchEventos();
+        } else {
+          fetchAsistentes();
+        }
       } else {
         const errorData = await res.json();
         console.error('Error al eliminar:', errorData);
@@ -87,6 +99,9 @@ export default function EventosApp() {
     } catch (err) {
       console.error('Error de red:', err);
       alert('Error de red. Revisa la consola para más detalles.');
+    } finally {
+      setShowDeleteModal(false);
+      setItemToDelete(null);
     }
   };
 
@@ -268,6 +283,32 @@ export default function EventosApp() {
           </div>
         )}
       </div>
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-xl font-bold mb-4">Confirmar Eliminación</h3>
+            <p>¿Estás seguro de que quieres eliminar este elemento?</p>
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={confirmDelete}
+                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+              >
+                Eliminar
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setItemToDelete(null);
+                }}
+                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
