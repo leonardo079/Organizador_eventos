@@ -11,7 +11,7 @@ const ticketSchema = new mongoose.Schema({
 
 // Esquema flexible para promociones embebidas
 const promocionSchema = new mongoose.Schema({
-  codigo: { type: String, required: true, unique: true, sparse: true },
+  codigo: { type: String, required: true, unique: true },
   descuento: { type: Number, required: true }, // Porcentaje
   fechaInicio: { type: Date, required: true },
   fechaFin: { type: Date, required: true },

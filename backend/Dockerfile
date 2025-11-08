@@ -17,3 +17,4 @@ COPY . .
 EXPOSE 5000
 
 # El comando para iniciar la aplicación se define en docker-compose.yml
+CMD ["npm", "run", "dev"]

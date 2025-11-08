@@ -160,7 +160,7 @@ async function seedDatabase() {
       eventoId: techConf._id,
       ticketId: techConf.tickets[1]._id,
       fechaCompra: new Date(),
-      precioFinal: 240000,
+      precioFinal: 240000, // Precio VIP con descuento
       estado: 'Confirmado'
     });
     await maria.save();

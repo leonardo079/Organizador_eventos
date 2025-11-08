@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, Trash2, Plus } from 'lucide-react';
+import { Calendar, Users, Trash2, Plus, X, Ticket, Tag } from 'lucide-react';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -12,6 +12,12 @@ export default function EventosApp() {
   const [formData, setFormData] = useState({});
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  
+  // Estados para tickets y promociones
+  const [tickets, setTickets] = useState([]);
+  const [promociones, setPromociones] = useState([]);
+  const [newTicket, setNewTicket] = useState({ tipo: '', precio: '', cantidad: '' });
+  const [newPromo, setNewPromo] = useState({ codigo: '', descuento: '', fechaInicio: '', fechaFin: '' });
 
   useEffect(() => {
     if (activeTab === 'eventos') fetchEventos();
@@ -21,14 +27,11 @@ export default function EventosApp() {
   const fetchEventos = async () => {
     try {
       const res = await fetch(`${API_URL}/eventos`);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.mensaje || `HTTP error! status: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setEventos(data);
     } catch (err) {
-      console.error('Error al obtener eventos:', err);
+      console.error('Error:', err);
       alert(`Error al obtener eventos: ${err.message}`);
     }
   };
@@ -36,39 +39,92 @@ export default function EventosApp() {
   const fetchAsistentes = async () => {
     try {
       const res = await fetch(`${API_URL}/asistentes`);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.mensaje || `HTTP error! status: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setAsistentes(data);
     } catch (err) {
-      console.error('Error al obtener asistentes:', err);
+      console.error('Error:', err);
       alert(`Error al obtener asistentes: ${err.message}`);
     }
+  };
+
+  const addTicket = () => {
+    if (!newTicket.tipo || !newTicket.precio || !newTicket.cantidad) {
+      alert('Completa todos los campos del ticket');
+      return;
+    }
+    setTickets([...tickets, {
+      tipo: newTicket.tipo,
+      precio: parseFloat(newTicket.precio),
+      cantidad: parseInt(newTicket.cantidad),
+      vendidos: 0
+    }]);
+    setNewTicket({ tipo: '', precio: '', cantidad: '' });
+  };
+
+  const removeTicket = (index) => {
+    setTickets(tickets.filter((_, i) => i !== index));
+  };
+
+  const addPromocion = () => {
+    if (!newPromo.codigo || !newPromo.descuento || !newPromo.fechaInicio || !newPromo.fechaFin) {
+      alert('Completa todos los campos de la promoción');
+      return;
+    }
+    setPromociones([...promociones, {
+      codigo: newPromo.codigo,
+      descuento: parseFloat(newPromo.descuento),
+      fechaInicio: new Date(newPromo.fechaInicio),
+      fechaFin: new Date(newPromo.fechaFin),
+      activa: true
+    }]);
+    setNewPromo({ codigo: '', descuento: '', fechaInicio: '', fechaFin: '' });
+  };
+
+  const removePromocion = (index) => {
+    setPromociones(promociones.filter((_, i) => i !== index));
   };
 
   const handleSave = async () => {
     const url = modalType === 'evento' ? `${API_URL}/eventos` : `${API_URL}/asistentes`;
     
+    let dataToSend = { ...formData };
+    
+    if (modalType === 'evento') {
+      if (!formData.nombre || !formData.descripcion || !formData.fecha || !formData.lugar || !formData.capacidad) {
+        alert('Por favor completa todos los campos requeridos');
+        return;
+      }
+      dataToSend.tickets = tickets;
+      dataToSend.promociones = promociones;
+    } else {
+      if (!formData.nombre || !formData.email) {
+        alert('Por favor completa nombre y email');
+        return;
+      }
+    }
+    
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(dataToSend)
       });
       
       if (res.ok) {
         setShowModal(false);
         setFormData({});
+        setTickets([]);
+        setPromociones([]);
         activeTab === 'eventos' ? fetchEventos() : fetchAsistentes();
+        alert('¡Guardado exitosamente!');
       } else {
         const errorData = await res.json();
         console.error('Error del servidor:', errorData);
-        alert(`Error: ${errorData.mensaje || 'Ocurrió un error.'}\n${errorData.error || ''}`);
+        alert(`Error: ${errorData.mensaje || 'Ocurrió un error.'}`);
       }
     } catch (err) {
-      console.error('Error de red:', err);
+      console.error('Error:', err);
       alert('Error de red. Revisa la consola para más detalles.');
     }
   };
@@ -80,25 +136,22 @@ export default function EventosApp() {
 
   const confirmDelete = async () => {
     if (!itemToDelete) return;
-
     const { id, tipo } = itemToDelete;
+    
     try {
       const url = tipo === 'evento' ? `${API_URL}/eventos/${id}` : `${API_URL}/asistentes/${id}`;
       const res = await fetch(url, { method: 'DELETE' });
+      
       if (res.ok) {
-        if (tipo === 'evento') {
-          fetchEventos();
-        } else {
-          fetchAsistentes();
-        }
+        tipo === 'evento' ? fetchEventos() : fetchAsistentes();
+        alert('Eliminado exitosamente');
       } else {
         const errorData = await res.json();
-        console.error('Error al eliminar:', errorData);
-        alert(`Error: ${errorData.mensaje || 'No se pudo eliminar.'}`);
+        alert(`Error: ${errorData.mensaje}`);
       }
     } catch (err) {
-      console.error('Error de red:', err);
-      alert('Error de red. Revisa la consola para más detalles.');
+      console.error('Error:', err);
+      alert('Error de red');
     } finally {
       setShowDeleteModal(false);
       setItemToDelete(null);
@@ -108,6 +161,8 @@ export default function EventosApp() {
   const openModal = (tipo) => {
     setModalType(tipo);
     setFormData({});
+    setTickets([]);
+    setPromociones([]);
     setShowModal(true);
   };
 
@@ -260,14 +315,6 @@ export default function EventosApp() {
                           </div>
                         </div>
                       )}
-
-                      {asistente.asistencias && asistente.asistencias.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-sm text-gray-600">
-                            Eventos asistidos: {asistente.asistencias.length}
-                          </p>
-                        </div>
-                      )}
                     </div>
 
                     <button
@@ -311,55 +358,177 @@ export default function EventosApp() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full my-8">
             <h3 className="text-xl font-bold mb-4">
               Crear {modalType === 'evento' ? 'Evento' : 'Asistente'}
             </h3>
             
-            <div className="space-y-3">
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
               {modalType === 'evento' ? (
                 <>
-                  <input
-                    type="text"
-                    placeholder="Nombre del evento"
-                    className="w-full px-3 py-2 border rounded-lg"
-                    onChange={(e) => setFormData({...formData, nombre: e.target.value})}
-                  />
-                  <textarea
-                    placeholder="Descripción"
-                    className="w-full px-3 py-2 border rounded-lg"
-                    onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
-                  />
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 border rounded-lg"
-                    onChange={(e) => setFormData({...formData, fecha: e.target.value})}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Lugar"
-                    className="w-full px-3 py-2 border rounded-lg"
-                    onChange={(e) => setFormData({...formData, lugar: e.target.value})}
-                  />
-                  <input
-                    type="number"
-                    placeholder="Capacidad"
-                    className="w-full px-3 py-2 border rounded-lg"
-                    onChange={(e) => setFormData({...formData, capacidad: parseInt(e.target.value)})}
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del evento *</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border rounded-lg"
+                      onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Descripción *</label>
+                    <textarea
+                      className="w-full px-3 py-2 border rounded-lg"
+                      rows="3"
+                      onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Fecha *</label>
+                      <input
+                        type="date"
+                        className="w-full px-3 py-2 border rounded-lg"
+                        onChange={(e) => setFormData({...formData, fecha: e.target.value})}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Capacidad *</label>
+                      <input
+                        type="number"
+                        className="w-full px-3 py-2 border rounded-lg"
+                        onChange={(e) => setFormData({...formData, capacidad: parseInt(e.target.value)})}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Lugar *</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border rounded-lg"
+                      onChange={(e) => setFormData({...formData, lugar: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Ticket size={20} className="text-green-600" />
+                      <h4 className="font-semibold text-gray-800">Tickets</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-4 gap-2 mb-2">
+                      <input
+                        type="text"
+                        placeholder="Tipo"
+                        className="px-3 py-2 border rounded-lg"
+                        value={newTicket.tipo}
+                        onChange={(e) => setNewTicket({...newTicket, tipo: e.target.value})}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Precio"
+                        className="px-3 py-2 border rounded-lg"
+                        value={newTicket.precio}
+                        onChange={(e) => setNewTicket({...newTicket, precio: e.target.value})}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Cantidad"
+                        className="px-3 py-2 border rounded-lg"
+                        value={newTicket.cantidad}
+                        onChange={(e) => setNewTicket({...newTicket, cantidad: e.target.value})}
+                      />
+                      <button
+                        onClick={addTicket}
+                        className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {tickets.map((ticket, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-green-50 p-2 rounded">
+                          <span className="text-sm">{ticket.tipo} - ${ticket.precio.toLocaleString()} ({ticket.cantidad} disponibles)</span>
+                          <button onClick={() => removeTicket(idx)} className="text-red-600 hover:text-red-800">
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Tag size={20} className="text-purple-600" />
+                      <h4 className="font-semibold text-gray-800">Promociones</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <input
+                        type="text"
+                        placeholder="Código"
+                        className="px-3 py-2 border rounded-lg"
+                        value={newPromo.codigo}
+                        onChange={(e) => setNewPromo({...newPromo, codigo: e.target.value})}
+                      />
+                      <input
+                        type="number"
+                        placeholder="% Descuento"
+                        className="px-3 py-2 border rounded-lg"
+                        value={newPromo.descuento}
+                        onChange={(e) => setNewPromo({...newPromo, descuento: e.target.value})}
+                      />
+                      <input
+                        type="date"
+                        placeholder="Fecha Inicio"
+                        className="px-3 py-2 border rounded-lg"
+                        value={newPromo.fechaInicio}
+                        onChange={(e) => setNewPromo({...newPromo, fechaInicio: e.target.value})}
+                      />
+                      <input
+                        type="date"
+                        placeholder="Fecha Fin"
+                        className="px-3 py-2 border rounded-lg"
+                        value={newPromo.fechaFin}
+                        onChange={(e) => setNewPromo({...newPromo, fechaFin: e.target.value})}
+                      />
+                    </div>
+                    
+                    <button
+                      onClick={addPromocion}
+                      className="w-full bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 flex items-center justify-center gap-2 mb-2"
+                    >
+                      <Plus size={16} /> Agregar Promoción
+                    </button>
+
+                    <div className="space-y-2">
+                      {promociones.map((promo, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-purple-50 p-2 rounded">
+                          <span className="text-sm">{promo.codigo} - {promo.descuento}%</span>
+                          <button onClick={() => removePromocion(idx)} className="text-red-600 hover:text-red-800">
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </>
               ) : (
                 <>
                   <input
                     type="text"
-                    placeholder="Nombre completo"
+                    placeholder="Nombre completo *"
                     className="w-full px-3 py-2 border rounded-lg"
                     onChange={(e) => setFormData({...formData, nombre: e.target.value})}
                   />
                   <input
                     type="email"
-                    placeholder="Email"
+                    placeholder="Email *"
                     className="w-full px-3 py-2 border rounded-lg"
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                   />
@@ -377,21 +546,25 @@ export default function EventosApp() {
                   />
                 </>
               )}
+            </div>
 
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={handleSave}
-                  className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
-                >
-                  Guardar
-                </button>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
-                >
-                  Cancelar
-                </button>
-              </div>
+            <div className="flex gap-3 mt-6 pt-4 border-t">
+              <button
+                onClick={handleSave}
+                className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+              >
+                Guardar
+              </button>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setTickets([]);
+                  setPromociones([]);
+                }}
+                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>
