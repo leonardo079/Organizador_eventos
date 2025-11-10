@@ -674,6 +674,19 @@ export default function EventosApp() {
                     value={formData.empresa || ''}
                     onChange={(e) => setFormData({...formData, empresa: e.target.value})}
                   />
+                  <input
+                    type="text"
+                    placeholder="Intereses (separados por coma)"
+                    className="w-full px-3 py-2 border rounded-lg"
+                    value={formData.preferencias?.intereses?.join(', ') || ''}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      preferencias: {
+                        ...formData.preferencias,
+                        intereses: e.target.value.split(',').map(i => i.trim())
+                      }
+                    })}
+                  />
                 </>
               )}
             </div>
