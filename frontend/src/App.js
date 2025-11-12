@@ -16,6 +16,9 @@ export default function EventosApp() {
   const [itemToDelete, setItemToDelete] = useState(null);
   const [additionalFields, setAdditionalFields] = useState([]);
   const [newAdditionalField, setNewAdditionalField] = useState({ key: '', value: '' });
+  const [showRegisterEventModal, setShowRegisterEventModal] = useState(false);
+  const [selectedAttendeeForRegistration, setSelectedAttendeeForRegistration] = useState(null);
+  const [selectedEventToRegister, setSelectedEventToRegister] = useState('');
   
   // 2. Nuevo estado para saber si estamos editando o creando
   const [currentItem, setCurrentItem] = useState(null); 
@@ -215,6 +218,34 @@ export default function EventosApp() {
     }
   };
 
+  const handleRegisterForEvent = async () => {
+    if (!selectedAttendeeForRegistration || !selectedEventToRegister) {
+      alert('Por favor selecciona un asistente y un evento.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/asistentes/${selectedAttendeeForRegistration._id}/asistencias`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventoId: selectedEventToRegister })
+      });
+
+      if (res.ok) {
+        handleCloseModal(); // Cierra el modal de registro y resetea estados
+        fetchAsistentes(); // Refresca la lista de asistentes para mostrar el nuevo registro
+        alert('¡Asistente registrado al evento exitosamente!');
+      } else {
+        const errorData = await res.json();
+        console.error('Error del servidor:', errorData);
+        alert(`Error al registrar asistente al evento: ${errorData.mensaje || 'Ocurrió un error.'}`);
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      alert('Error de red al registrar asistente al evento. Revisa la consola para más detalles.');
+    }
+  };
+
 
   // --- LÓGICA DE ELIMINACIÓN (Sin cambios) ---
   const handleDelete = (id, tipo) => {
@@ -289,6 +320,15 @@ export default function EventosApp() {
     setPromociones([]);
     setAdditionalFields([]); // Reset additional fields
     setNewAdditionalField({ key: '', value: '' }); // Reset new additional field input
+    setShowRegisterEventModal(false); // Reset register event modal state
+    setSelectedAttendeeForRegistration(null); // Reset selected attendee for registration
+    setSelectedEventToRegister(''); // Reset selected event for registration
+  };
+
+  const openRegisterEventModal = (asistente) => {
+    setSelectedAttendeeForRegistration(asistente);
+    fetchEventos(); // Asegura que la lista de eventos esté actualizada
+    setShowRegisterEventModal(true);
   };
 
   return (
@@ -466,10 +506,71 @@ export default function EventosApp() {
                           </div>
                         </div>
                       )}
+
+                      {asistente.asistencias && asistente.asistencias.length > 0 && (
+                        <div className="mt-3">
+                          <p className="font-semibold text-gray-700 mb-2">Eventos Registrados:</p>
+                          {(() => {
+                            const now = new Date();
+                            const pastEvents = [];
+                            const upcomingEvents = [];
+
+                            asistente.asistencias.forEach(asistencia => {
+                              if (asistencia.eventoId && asistencia.eventoId.fecha) {
+                                const eventDate = new Date(asistencia.eventoId.fecha);
+                                if (eventDate < now) {
+                                  pastEvents.push(asistencia.eventoId);
+                                } else {
+                                  upcomingEvents.push(asistencia.eventoId);
+                                }
+                              }
+                            });
+
+                            return (
+                              <>
+                                {pastEvents.length > 0 && (
+                                  <div className="mb-2">
+                                    <p className="font-medium text-gray-600">Pasados:</p>
+                                    <div className="flex gap-2 flex-wrap">
+                                      {pastEvents.map((evento, idx) => (
+                                        <span key={idx} className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm">
+                                          {evento.nombre} ({new Date(evento.fecha).toLocaleDateString()})
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {upcomingEvents.length > 0 && (
+                                  <div>
+                                    <p className="font-medium text-gray-600">Próximos:</p>
+                                    <div className="flex gap-2 flex-wrap">
+                                      {upcomingEvents.map((evento, idx) => (
+                                        <span key={idx} className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                                          {evento.nombre} ({new Date(evento.fecha).toLocaleDateString()})
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {pastEvents.length === 0 && upcomingEvents.length === 0 && (
+                                  <p className="text-sm text-gray-500">No hay eventos registrados.</p>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
 
                     {/* --- 3. Botones de Acción (Editar y Borrar) --- */}
                     <div className="flex">
+                      <button
+                        onClick={() => openRegisterEventModal(asistente)}
+                        className="text-green-600 hover:text-green-800 p-2"
+                        title="Inscribir a Evento"
+                      >
+                        <Ticket size={20} />
+                      </button>
                       <button
                         onClick={() => openModal('asistente', asistente)}
                         className="text-blue-600 hover:text-blue-800 p-2"
@@ -786,6 +887,64 @@ export default function EventosApp() {
               </button>
               <button
                 onClick={handleCloseModal} // Usamos la nueva función de cierre
+                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL DE REGISTRO A EVENTO --- */}
+      {showRegisterEventModal && selectedAttendeeForRegistration && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full my-8">
+            <h3 className="text-xl font-bold mb-4">
+              Inscribir a {selectedAttendeeForRegistration.nombre} a un Evento
+            </h3>
+            
+            <div className="space-y-4">
+              {console.log({ eventos, selectedAttendeeForRegistration })}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Seleccionar Evento</label>
+                <select
+                  className="w-full px-3 py-2 border rounded-lg"
+                  value={selectedEventToRegister}
+                  onChange={(e) => setSelectedEventToRegister(e.target.value)}
+                >
+                  <option value="">-- Selecciona un evento --</option>
+                  {eventos
+                    .filter(evento => {
+                      const eventDate = new Date(evento.fecha);
+                      const now = new Date();
+                      // Solo eventos futuros
+                      if (eventDate < now) return false;
+
+                      // Filtrar eventos a los que ya está registrado el asistente
+                      const isAlreadyRegistered = selectedAttendeeForRegistration.asistencias.some(
+                        asistencia => asistencia.eventoId && asistencia.eventoId._id === evento._id
+                      );
+                      return !isAlreadyRegistered;
+                    })
+                    .map(evento => (
+                      <option key={evento._id} value={evento._id}>
+                        {evento.nombre} ({new Date(evento.fecha).toLocaleDateString()})
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-4 border-t">
+              <button
+                onClick={handleRegisterForEvent}
+                className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+              >
+                Inscribir
+              </button>
+              <button
+                onClick={handleCloseModal}
                 className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
               >
                 Cancelar
