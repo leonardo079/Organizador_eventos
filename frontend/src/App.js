@@ -14,6 +14,8 @@ export default function EventosApp() {
   const [formData, setFormData] = useState({});
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [additionalFields, setAdditionalFields] = useState([]);
+  const [newAdditionalField, setNewAdditionalField] = useState({ key: '', value: '' });
   
   // 2. Nuevo estado para saber si estamos editando o creando
   const [currentItem, setCurrentItem] = useState(null); 
@@ -91,6 +93,19 @@ export default function EventosApp() {
     setPromociones(promociones.filter((_, i) => i !== index));
   };
 
+  const handleAddAdditionalField = () => {
+    if (newAdditionalField.key && newAdditionalField.value) {
+      setAdditionalFields([...additionalFields, newAdditionalField]);
+      setNewAdditionalField({ key: '', value: '' });
+    } else {
+      alert('Por favor, ingresa tanto la clave como el valor para el campo adicional.');
+    }
+  };
+
+  const handleRemoveAdditionalField = (keyToRemove) => {
+    setAdditionalFields(additionalFields.filter(field => field.key !== keyToRemove));
+  };
+
   // --- 4. LÓGICA DE GUARDADO (Refactorizada) ---
 
   // handleSave ahora decide si crear o actualizar
@@ -120,6 +135,11 @@ export default function EventosApp() {
         alert('Por favor completa nombre y email');
         return;
       }
+      // Convertir additionalFields de array a objeto para enviar al backend
+      dataToSend.datosAdicionales = additionalFields.reduce((acc, field) => {
+        acc[field.key] = field.value;
+        return acc;
+      }, {});
     }
     
     try {
@@ -166,6 +186,11 @@ export default function EventosApp() {
         alert('Por favor completa nombre y email');
         return;
       }
+      // Convertir additionalFields de array a objeto para enviar al backend
+      dataToSend.datosAdicionales = additionalFields.reduce((acc, field) => {
+        acc[field.key] = field.value;
+        return acc;
+      }, {});
     }
     
     try {
@@ -240,6 +265,10 @@ export default function EventosApp() {
       if (tipo === 'evento') {
         setTickets(item.tickets || []);
         setPromociones(item.promociones || []);
+      } else if (tipo === 'asistente' && item.datosAdicionales) {
+        // Convertir datosAdicionales de objeto a array para edición
+        const fields = Object.entries(item.datosAdicionales).map(([key, value]) => ({ key, value }));
+        setAdditionalFields(fields);
       }
     } else {
       // Estamos CREANDO
@@ -258,6 +287,8 @@ export default function EventosApp() {
     setFormData({});
     setTickets([]);
     setPromociones([]);
+    setAdditionalFields([]); // Reset additional fields
+    setNewAdditionalField({ key: '', value: '' }); // Reset new additional field input
   };
 
   return (
@@ -417,6 +448,19 @@ export default function EventosApp() {
                             {asistente.preferencias.intereses.map((interes, idx) => (
                               <span key={idx} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
                                 {interes}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {asistente.datosAdicionales && Object.keys(asistente.datosAdicionales).length > 0 && (
+                        <div className="mt-3">
+                          <p className="font-semibold text-gray-700 mb-2">Datos Adicionales:</p>
+                          <div className="flex gap-2 flex-wrap">
+                            {Object.entries(asistente.datosAdicionales).map(([key, value]) => (
+                              <span key={key} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">
+                                {key}: {value}
                               </span>
                             ))}
                           </div>
@@ -687,6 +731,48 @@ export default function EventosApp() {
                       }
                     })}
                   />
+
+                  {/* Sección para Datos Adicionales */}
+                  <div className="border-t pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Tag size={20} className="text-indigo-600" />
+                      <h4 className="font-semibold text-gray-800">Datos Adicionales</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      <input
+                        type="text"
+                        placeholder="Clave (ej: Talla Camiseta)"
+                        className="col-span-1 px-3 py-2 border rounded-lg"
+                        value={newAdditionalField.key}
+                        onChange={(e) => setNewAdditionalField({...newAdditionalField, key: e.target.value})}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Valor (ej: M)"
+                        className="col-span-1 px-3 py-2 border rounded-lg"
+                        value={newAdditionalField.value}
+                        onChange={(e) => setNewAdditionalField({...newAdditionalField, value: e.target.value})}
+                      />
+                      <button
+                        onClick={handleAddAdditionalField}
+                        className="col-span-1 bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center"
+                      >
+                        <Plus size={16} /> Añadir Campo
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {additionalFields.map((field, idx) => (
+                        <div key={field.key + idx} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                          <span className="text-sm font-medium">{field.key}: <span className="font-normal">{field.value}</span></span>
+                          <button onClick={() => handleRemoveAdditionalField(field.key)} className="text-red-600 hover:text-red-800">
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </>
               )}
             </div>
